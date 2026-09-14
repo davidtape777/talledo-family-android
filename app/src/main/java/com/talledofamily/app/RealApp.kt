@@ -210,7 +210,7 @@ private fun FamilyDashboard(session: UserSession, me: FamilyMember, onExit: () -
     Scaffold(
         containerColor=TfCream,
         topBar={ TopAppBar(title={Column{Text(family?.name ?: "TALLEDO FAMILY",fontWeight=FontWeight.Black); Text("Cuenta real · mapa simulado",fontSize=11.sp,color=TfMint)}},actions={TextButton(onClick=onExit){Text("Salir")}},colors=TopAppBarDefaults.topAppBarColors(containerColor=TfCream)) },
-        bottomBar={ NavigationBar { listOf("Familia","Mapa demo","Privacidad").forEachIndexed { i,label -> NavigationBarItem(selectedTab==i,{selectedTab=i},{Text(listOf("⌂","◎","◉")[i],fontSize=20.sp)},{Text(label)}) } } }
+        bottomBar={ NavigationBar { listOf("Familia","Mapa demo","Privacidad").forEachIndexed { i,label -> NavigationBarItem(selected = selectedTab == i, onClick = { selectedTab = i }, icon = { Text(listOf("⌂","◎","◉")[i], fontSize = 20.sp) }, label = { Text(label) }) } } }
     ){ padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when(selectedTab) {
