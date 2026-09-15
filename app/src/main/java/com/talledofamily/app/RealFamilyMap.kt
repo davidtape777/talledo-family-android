@@ -51,7 +51,13 @@ fun RealFamilyMap() {
             properties = MapProperties(isMyLocationEnabled = permissionGranted),
             uiSettings = MapUiSettings(myLocationButtonEnabled = permissionGranted, zoomControlsEnabled = false)
         ) {
-            current?.let { Marker(state = rememberUpdatedMarkerState(it), title = "Mi ubicación", snippet = "Visible solo con tu permiso") }
+            current?.let { position ->
+                Marker(
+                    state = MarkerState(position = position),
+                    title = "Mi ubicación",
+                    snippet = "Visible solo con tu permiso"
+                )
+            }
         }
         Card(
             modifier = Modifier.align(Alignment.TopCenter).padding(14.dp),
