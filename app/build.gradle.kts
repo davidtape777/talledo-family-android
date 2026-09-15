@@ -49,7 +49,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-core")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    implementation("com.google.maps.android:maps-compose:8.4.0")
+    implementation("com.google.maps.android:maps-compose:6.4.1")
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("com.google.firebase:firebase-messaging")
     debugImplementation("androidx.compose.ui:ui-tooling")
