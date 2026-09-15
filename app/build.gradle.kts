@@ -2,7 +2,10 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.google.gms.google-services")
 }
+
+val mapsApiKey = providers.gradleProperty("MAPS_API_KEY").orElse("MISSING_MAPS_API_KEY")
 
 android {
     namespace = "com.talledofamily.app"
@@ -12,10 +15,11 @@ android {
         applicationId = "com.talledofamily.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "2.0-real-test"
+        versionCode = 3
+        versionName = "3.0-location-preview"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey.get()
         buildConfigField("String", "SUPABASE_URL", "\"https://xxlakmkmlhfhscvdpeyu.supabase.co\"")
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"sb_publishable_Um80ghlK_ZA1LrcwZck8MA_FQpRyoCc\"")
     }
@@ -31,21 +35,23 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures {
-        compose = true
-        buildConfig = true
-    }
+    buildFeatures { compose = true; buildConfig = true }
     packaging.resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
 }
 
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.01.01"))
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation("androidx.activity:activity-compose:1.10.0")
+    implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-core")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation("com.google.maps.android:maps-compose:8.4.0")
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+    implementation("com.google.firebase:firebase-messaging")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
 }

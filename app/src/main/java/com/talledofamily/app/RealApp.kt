@@ -209,8 +209,8 @@ private fun FamilyDashboard(session: UserSession, me: FamilyMember, onExit: () -
 
     Scaffold(
         containerColor=TfCream,
-        topBar={ TopAppBar(title={Column{Text(family?.name ?: "TALLEDO FAMILY",fontWeight=FontWeight.Black); Text("Cuenta real · mapa simulado",fontSize=11.sp,color=TfMint)}},actions={TextButton(onClick=onExit){Text("Salir")}},colors=TopAppBarDefaults.topAppBarColors(containerColor=TfCream)) },
-        bottomBar={ NavigationBar { listOf("Familia","Mapa demo","Privacidad").forEachIndexed { i,label -> NavigationBarItem(selected = selectedTab == i, onClick = { selectedTab = i }, icon = { Text(listOf("⌂","◎","◉")[i], fontSize = 20.sp) }, label = { Text(label) }) } } }
+        topBar={ TopAppBar(title={Column{Text(family?.name ?: "TALLEDO FAMILY",fontWeight=FontWeight.Black); Text("Cuenta real · mapa protegido",fontSize=11.sp,color=TfMint)}},actions={TextButton(onClick=onExit){Text("Salir")}},colors=TopAppBarDefaults.topAppBarColors(containerColor=TfCream)) },
+        bottomBar={ NavigationBar { listOf("Familia","Mapa","Privacidad").forEachIndexed { i,label -> NavigationBarItem(selected = selectedTab == i, onClick = { selectedTab = i }, icon = { Text(listOf("⌂","◎","◉")[i], fontSize = 20.sp) }, label = { Text(label) }) } } }
     ){ padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when(selectedTab) {
@@ -241,7 +241,7 @@ private fun FamilyDashboard(session: UserSession, me: FamilyMember, onExit: () -
                         Button(onClick={scope.launch{runCatching{api.sendEvent(session,me.familyId,me.id,"need_me")}.onSuccess{notice="Prueba TE NECESITO registrada; no se enviaron alertas externas"}.onFailure{error=it.message}}},Modifier.fillMaxWidth().height(58.dp),colors=ButtonDefaults.buttonColors(containerColor=TfCoral)){Text("TE NECESITO · PRUEBA",fontWeight=FontWeight.Black)}
                     }
                 }
-                1 -> Box(Modifier.fillMaxSize().padding(20.dp).background(Color(0xFFE4F1E9),RoundedCornerShape(24.dp)),contentAlignment=Alignment.Center){Column(horizontalAlignment=Alignment.CenterHorizontally){Text("◎",fontSize=70.sp,color=TfPurple);Text("Mapa familiar simulado",fontSize=23.sp,fontWeight=FontWeight.Bold);Text("No se solicita ni comparte GPS.",color=TfInk.copy(alpha=.6f))}}
+                1 -> RealFamilyMap()
                 else -> PrivacyScreen(session,api,me,members) { error=it }
             }
             error?.let { AlertDialog(onDismissRequest={error=null},title={Text("No se pudo completar")},text={Text(it)},confirmButton={TextButton(onClick={error=null}){Text("Entendido")}}) }
