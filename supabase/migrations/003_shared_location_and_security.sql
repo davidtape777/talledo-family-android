@@ -154,13 +154,24 @@ create policy "members send messages" on public.family_messages for insert to au
 );
 
 -- Imágenes privadas con ruta familia/usuario/uuid.jpg.
+create or replace function public.can_read_family_photo(object_path text)
+returns boolean language sql stable security definer set search_path=public,storage as $$
+ select
+ exists(select 1 from public.family_members me where me.auth_user_id=auth.uid()
+ and me.family_id::text=(storage.foldername(object_path))[1]
+ and me.auth_user_id::text=(storage.foldername(object_path))[2])
+ or exists(select 1 from public.families f where f.photo_url=object_path and public.is_family_member(f.id))
+ or exists(select 1 from public.family_members m where m.avatar_url=object_path and public.can_read_location(m.id,m.family_id));
+$$;
 create policy "family reads private photos" on storage.objects for select to authenticated using(
- bucket_id='family-avatars' and (storage.foldername(name))[1] in(select family_id::text from public.family_members where auth_user_id=auth.uid())
+ bucket_id='family-avatars' and public.can_read_family_photo(name)
 );
 create policy "family uploads private photos" on storage.objects for insert to authenticated with check(
  bucket_id='family-avatars' and (storage.foldername(name))[1] in(select family_id::text from public.family_members where auth_user_id=auth.uid())
  and (storage.foldername(name))[2]=auth.uid()::text
 );
+revoke all on function public.is_family_guardian(uuid),public.member_in_family(uuid,uuid),public.members_blocked(uuid,uuid),public.can_read_location(uuid,uuid),public.can_read_family_photo(text) from public,anon;
+grant execute on function public.is_family_guardian(uuid),public.member_in_family(uuid,uuid),public.members_blocked(uuid,uuid),public.can_read_location(uuid,uuid),public.can_read_family_photo(text) to authenticated;
 grant select on public.family_locations to authenticated;
 revoke all on function public.approve_guardian(uuid),public.publish_location(double precision,double precision,real,timestamptz),public.pause_location() from public,anon;
 grant execute on function public.approve_guardian(uuid),public.publish_location(double precision,double precision,real,timestamptz),public.pause_location() to authenticated;

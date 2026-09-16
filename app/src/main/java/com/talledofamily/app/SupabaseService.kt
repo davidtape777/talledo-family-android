@@ -11,7 +11,7 @@ data class UserSession(val accessToken: String, val refreshToken: String, val us
 data class FamilyMember(val id: String, val familyId: String, val authUserId: String?, val name: String, val relationship: String, val role: String, val avatarUrl: String?, val birthDate: String? = null, val phone: String? = null, val privacyPermitted: Boolean = true)
 data class FamilyInfo(val id: String, val name: String, val joinCode: String, val photoUrl: String?)
 data class SharedLocation(val memberId:String,val sharing:Boolean,val latitude:Double,val longitude:Double,val accuracy:Double,val capturedAt:String)
-data class FamilyMessage(val id:String,val senderId:String,val body:String,val createdAt:String)
+data class RemoteFamilyMessage(val id:String,val senderId:String,val body:String,val createdAt:String)
 class SupabaseException(message: String) : Exception(message)
 
 class SupabaseService {
@@ -104,10 +104,10 @@ class SupabaseService {
     suspend fun pauseLocation(session: UserSession) = withContext(Dispatchers.IO) {
         request("/rest/v1/rpc/pause_location","POST",session.accessToken,JSONObject())
     }
-    suspend fun messages(session: UserSession, familyId: String, recipient: String?, me: String): List<FamilyMessage> = withContext(Dispatchers.IO) {
+    suspend fun messages(session: UserSession, familyId: String, recipient: String?, me: String): List<RemoteFamilyMessage> = withContext(Dispatchers.IO) {
         val filter=if(recipient==null) "&recipient_member_id=is.null" else "&or=(and(sender_member_id.eq.$me,recipient_member_id.eq.$recipient),and(sender_member_id.eq.$recipient,recipient_member_id.eq.$me))"
         val rows=JSONArray(request("/rest/v1/family_messages?family_id=eq.$familyId$filter&select=*&order=created_at.desc&limit=100",token=session.accessToken))
-        List(rows.length()){ val o=rows.getJSONObject(it); FamilyMessage(o.getString("id"),o.getString("sender_member_id"),o.getString("body"),o.getString("created_at")) }.reversed()
+        List(rows.length()){ val o=rows.getJSONObject(it); RemoteFamilyMessage(o.getString("id"),o.getString("sender_member_id"),o.getString("body"),o.getString("created_at")) }.reversed()
     }
     suspend fun sendMessage(session: UserSession, familyId: String, me: String, recipient: String?, body: String) = withContext(Dispatchers.IO) {
         request("/rest/v1/family_messages","POST",session.accessToken,JSONObject().put("family_id",familyId).put("sender_member_id",me).put("recipient_member_id",recipient?:JSONObject.NULL).put("body",body.trim()))

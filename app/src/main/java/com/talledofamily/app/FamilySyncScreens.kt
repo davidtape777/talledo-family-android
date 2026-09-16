@@ -112,7 +112,7 @@ fun SyncedMessages(session:UserSession,me:FamilyMember,members:List<FamilyMember
     val scope=rememberCoroutineScope()
     val lifecycle=LocalLifecycleOwner.current.lifecycle
     var recipient by remember{mutableStateOf<String?>(null)}
-    var rows by remember{mutableStateOf(emptyList<FamilyMessage>())}
+    var rows by remember{mutableStateOf(emptyList<RemoteFamilyMessage>())}
     var draft by remember{mutableStateOf("")}
     var error by remember{mutableStateOf<String?>(null)}
     var sending by remember{mutableStateOf(false)}
