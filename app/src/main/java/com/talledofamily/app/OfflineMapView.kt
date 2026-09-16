@@ -15,6 +15,7 @@ internal data class OfflineTileKey(val z: Int, val x: Int, val y: Int)
 /** A local-only raster viewer, independent of Google Maps and network services. */
 internal class OfflineMapView(context: Context, private val info: OfflineMapInfo) : View(context) {
     private val executor = Executors.newSingleThreadExecutor()
+    private val main = android.os.Handler(android.os.Looper.getMainLooper())
     private var database: OfflineMbtiles? = null // worker-thread ownership
     private val cache = object : LruCache<OfflineTileKey, Bitmap>(16 * 1024 * 1024) {
         override fun sizeOf(key: OfflineTileKey, value: Bitmap) = value.byteCount
@@ -56,8 +57,8 @@ internal class OfflineMapView(context: Context, private val info: OfflineMapInfo
     private val render = Runnable { loadVisible() }
     private fun schedule() {
         generation++
-        removeCallbacks(render)
-        if (!closed) postDelayed(render, 30)
+        main.removeCallbacks(render)
+        if (!closed) main.postDelayed(render, 30)
     }
     private fun loadVisible() {
         if (closed || width == 0 || height == 0) return
@@ -78,8 +79,8 @@ internal class OfflineMapView(context: Context, private val info: OfflineMapInfo
                     val image = cache.get(key) ?: db.tile(key.z,key.x,key.y)?.also { cache.put(key,it) }
                     if (image != null) result[key] = image
                 }
-                post { if (!closed && token == generation) { tiles = result; invalidate() } }
-            }.onFailure { post { if (!closed) onReadError?.invoke("No se pudo leer el mapa local. Importa un archivo compatible.") } }
+                main.post { if (!closed && token == generation) { tiles = result; invalidate() } }
+            }.onFailure { main.post { if (!closed) onReadError?.invoke("No se pudo leer el mapa local. Importa un archivo compatible.") } }
         }
     }
     override fun onDraw(canvas: Canvas) {
@@ -115,9 +116,11 @@ internal class OfflineMapView(context: Context, private val info: OfflineMapInfo
         return true
     }
     override fun performClick(): Boolean { super.performClick(); return true }
-    override fun onDetachedFromWindow() {
-        closed=true; generation++; removeCallbacks(render)
+    fun close() {
+        if(closed) return
+        closed=true; generation++; main.removeCallbacks(render)
         executor.execute { database?.close(); database=null; cache.evictAll() }
-        executor.shutdown(); tiles=emptyMap(); super.onDetachedFromWindow()
+        executor.shutdown(); tiles=emptyMap()
     }
+    override fun onDetachedFromWindow() { close(); super.onDetachedFromWindow() }
 }

@@ -124,7 +124,7 @@ fun OfflineMapScreen(onClose: () -> Unit) {
             Text(current.name+" · "+(current.bytes/1024/1024)+" MB",Modifier.padding(horizontal=12.dp),style=MaterialTheme.typography.labelMedium)
             key(revision) {
                 AndroidView(factory={OfflineMapView(it,current).also { created -> view=created; created.onReadError={message->error=message} }},
-                    modifier=Modifier.fillMaxWidth().weight(1f),update={it.setLocalLocation(location)})
+                    modifier=Modifier.fillMaxWidth().weight(1f),onReset=null,onRelease={it.close()},update={it.setLocalLocation(location)})
             }
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceEvenly) {
                 TextButton(onClick={view?.zoomBy(-1)}){Text("−")}

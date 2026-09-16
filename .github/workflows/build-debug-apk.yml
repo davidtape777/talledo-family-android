@@ -74,6 +74,17 @@ jobs:
       - name: Run unit tests
         run: gradle --no-daemon -PMAPS_API_KEY="$MAPS_API_KEY" testDebugUnitTest
 
+      - name: Upload unit test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TALLEDO-FAMILY-v5-test-reports
+          path: |
+            app/build/test-results/testDebugUnitTest/
+            app/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Build debug APK
         run: gradle --no-daemon -PMAPS_API_KEY="$MAPS_API_KEY" assembleDebug
 

@@ -102,10 +102,9 @@ class OfflineMbtilesTest {
     @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
     fun viewerRendersLocalRaster() {
         val info=OfflineMapStore.import(context,Uri.fromFile(fixture()))
-        val controller=org.robolectric.Robolectric.buildActivity(android.app.Activity::class.java).setup()
-        val activity=controller.get()
-        val view=OfflineMapView(activity,info)
-        activity.setContentView(view)
+        val view=OfflineMapView(context,info)
+        var readError:String?=null
+        view.onReadError={readError=it}
         view.layout(0,0,128,128)
         val image=Bitmap.createBitmap(128,128,Bitmap.Config.ARGB_8888)
         var rendered=false
@@ -117,10 +116,9 @@ class OfflineMbtilesTest {
                 rendered=image.getPixel(64,64)==Color.RED
                 if(!rendered) Thread.sleep(20)
             }
-            assertTrue("The local raster should be drawn without any map SDK or tile server",rendered)
+            assertTrue("The local raster should be drawn without a tile server; pixel=${image.getPixel(64,64)}, readError=$readError",rendered)
         } finally {
-            activity.setContentView(android.view.View(activity))
-            controller.pause().stop().destroy(); image.recycle()
+            view.close(); image.recycle()
         }
     }
 }
