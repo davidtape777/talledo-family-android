@@ -1,5 +1,7 @@
 package com.talledofamily.app
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,10 +33,11 @@ private val relationships = listOf("padre", "madre", "hijo", "hija", "tutor", "o
 @Composable
 fun RealTalledoFamilyApp() {
     MaterialTheme(colorScheme = lightColorScheme(primary = TfPurple, secondary = TfCoral, tertiary = TfMint, background = TfCream)) {
-        var session by remember { mutableStateOf<UserSession?>(null) }
+        var session by remember { mutableStateOf<UserSession?>(SessionVault.current()) }
+        val context=androidx.compose.ui.platform.LocalContext.current
         Surface(Modifier.fillMaxSize(), color = TfCream) {
             if (session == null) AuthScreen { session = it }
-            else ConnectedApp(session!!, onExit = { session = null })
+            else ConnectedApp(session!!, onExit = { SessionVault.clear(); session = null })
         }
     }
 }
@@ -88,7 +91,7 @@ private fun AuthScreen(onSession: (UserSession) -> Unit) {
         TextButton(onClick = { register = !register; message = null }) {
             Text(if (register) "Ya tengo una cuenta" else "Crear una cuenta nueva")
         }
-        Text("Conexión protegida con Supabase · pruebas reales", fontSize = 11.sp, color = TfInk.copy(alpha=.48f))
+        Text("TALLEDO FAMILY · acceso familiar protegido", fontSize = 11.sp, color = TfInk.copy(alpha=.48f))
     }
 }
 
@@ -175,6 +178,8 @@ private fun FamilyOnboarding(session: UserSession, onReady: () -> Unit) {
 private fun FamilyDashboard(session: UserSession, me: FamilyMember, onExit: () -> Unit, onReload: () -> Unit) {
     val api=remember { SupabaseService() }
     val scope=rememberCoroutineScope()
+    val context=androidx.compose.ui.platform.LocalContext.current
+    val guardian=me.role in listOf("admin","adult")
     var family by remember { mutableStateOf<FamilyInfo?>(null) }
     var members by remember { mutableStateOf(emptyList<FamilyMember>()) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -193,8 +198,8 @@ private fun FamilyDashboard(session: UserSession, me: FamilyMember, onExit: () -
     LaunchedEffect(me) { reload() }
 
     editMember?.let { target ->
-        MemberDialog(target.name,target.relationship,"Editar integrante",{editMember=null}) { name,relation ->
-            scope.launch { runCatching { api.updateMember(session,target.id,name,relation) }
+        MemberEditDialog(session,target,me.role=="admin",{editMember=null}) { name,relation,birth,phone,avatar ->
+            scope.launch { runCatching { api.updateMember(session,target.id,name,relation,birth,phone,avatar) }
                 .onSuccess { editMember=null; reload() }.onFailure { error=it.message } }
         }
     }
@@ -202,15 +207,15 @@ private fun FamilyDashboard(session: UserSession, me: FamilyMember, onExit: () -
         scope.launch { runCatching { api.addProfile(session,me.familyId,name,relation) }
             .onSuccess { addMember=false; reload() }.onFailure { error=it.message } }
     }
-    if(editFamily && family!=null) FamilyDialog(family!!,{editFamily=false}) { name,photo ->
+    if(editFamily && family!=null) FamilyPhotoDialog(session,family!!,{editFamily=false}) { name,photo ->
         scope.launch { runCatching { api.updateFamily(session,me.familyId,name,photo) }
             .onSuccess { editFamily=false; reload() }.onFailure { error=it.message } }
     }
 
     Scaffold(
         containerColor=TfCream,
-        topBar={ TopAppBar(title={Column{Text(family?.name ?: "TALLEDO FAMILY",fontWeight=FontWeight.Black); Text("Cuenta real · mapa protegido",fontSize=11.sp,color=TfMint)}},actions={TextButton(onClick=onExit){Text("Salir")}},colors=TopAppBarDefaults.topAppBarColors(containerColor=TfCream)) },
-        bottomBar={ NavigationBar { listOf("Familia","Mapa","Privacidad").forEachIndexed { i,label -> NavigationBarItem(selected = selectedTab == i, onClick = { selectedTab = i }, icon = { Text(listOf("⌂","◎","◉")[i], fontSize = 20.sp) }, label = { Text(label) }) } } }
+        topBar={ TopAppBar(title={Column{Text(family?.name ?: "TALLEDO FAMILY",fontWeight=FontWeight.Black); Text("Cuenta real · mapa protegido",fontSize=11.sp,color=TfMint)}},actions={TextButton(onClick={scope.launch{runCatching{LocationSharing.pause(context)}.onSuccess{onExit()}.onFailure{error="No se pudo retirar la ubicación del servidor. Activa Internet y vuelve a pulsar Salir."}}}){Text("Salir")}},colors=TopAppBarDefaults.topAppBarColors(containerColor=TfCream)) },
+        bottomBar={ NavigationBar { listOf("Familia","Mapa","Mensajes","Privacidad").forEachIndexed { i,label -> NavigationBarItem(selected = selectedTab == i, onClick = { selectedTab = i }, icon = { Text(listOf("⌂","◎","✉","◉")[i], fontSize = 20.sp) }, label = { Text(label) }) } } }
     ){ padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when(selectedTab) {
@@ -218,9 +223,10 @@ private fun FamilyDashboard(session: UserSession, me: FamilyMember, onExit: () -
                     item {
                         Card(colors=CardDefaults.cardColors(containerColor=TfPurple),shape=RoundedCornerShape(22.dp),modifier=Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(20.dp)) {
+                                PrivateFamilyPhoto(session,family?.photoUrl,Modifier.fillMaxWidth().heightIn(max=170.dp))
                                 Text(family?.name ?: "Tu familia",color=Color.White,fontSize=23.sp,fontWeight=FontWeight.Black)
                                 Text("Código para invitar: ${family?.joinCode ?: "------"}",color=Color.White.copy(alpha=.85f))
-                                if(me.role=="admin") TextButton(onClick={editFamily=true},colors=ButtonDefaults.textButtonColors(contentColor=Color.White)){Text("Cambiar nombre o imagen")}
+                                if(guardian) TextButton(onClick={editFamily=true},colors=ButtonDefaults.textButtonColors(contentColor=Color.White)){Text("Cambiar nombre o imagen")}
                             }
                         }
                     }
@@ -228,20 +234,25 @@ private fun FamilyDashboard(session: UserSession, me: FamilyMember, onExit: () -
                         Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=Color.White)){
                             Row(Modifier.padding(15.dp),verticalAlignment=Alignment.CenterVertically){
                                 Surface(Modifier.size(48.dp),CircleShape,color=TfPurple.copy(alpha=.13f)){Box(contentAlignment=Alignment.Center){Text(member.name.take(1).uppercase(),fontWeight=FontWeight.Black,color=TfPurple)}}
+                                PrivateFamilyPhoto(session,member.avatarUrl,Modifier.size(48.dp))
                                 Column(Modifier.padding(start=12.dp).weight(1f)){Text(member.name,fontWeight=FontWeight.Bold);Text(member.relationship.replaceFirstChar{it.uppercase()},fontSize=12.sp,color=TfInk.copy(alpha=.55f))}
-                                if(member.authUserId==session.userId || me.role=="admin") TextButton(onClick={editMember=member}){Text("Editar")}
+                                if(member.authUserId==session.userId || me.role=="admin" || (guardian && member.relationship in listOf("hijo","hija"))) TextButton(onClick={editMember=member}){Text("Editar")}
                             }
                         }
                     }
-                    if(me.role=="admin") item { OutlinedButton(onClick={addMember=true},Modifier.fillMaxWidth()){Text("+ Agregar hijo o integrante")} }
+                    if(me.role=="admin") items(members.filter{it.role=="member" && it.authUserId!=null && it.relationship in listOf("padre","madre","tutor")}){pending ->
+                        OutlinedButton(onClick={scope.launch{runCatching{api.approveGuardian(session,pending.id)}.onSuccess{reload()}.onFailure{error=it.message}}},modifier=Modifier.fillMaxWidth()){Text("Autorizar acceso parental: "+pending.name)}
+                    }
+                    if(guardian) item { OutlinedButton(onClick={addMember=true},Modifier.fillMaxWidth()){Text("+ Agregar hijo o integrante")} }
                     item {
-                        Button(onClick={scope.launch{runCatching{api.sendEvent(session,me.familyId,me.id,"family_touch")}.onSuccess{notice="Toque familiar registrado en Supabase"}.onFailure{error=it.message}}},Modifier.fillMaxWidth().height(54.dp)){Text("💜 ENVIAR TOQUE FAMILIAR")}
+                        Button(onClick={scope.launch{runCatching{api.sendMessage(session,me.familyId,me.id,null,"💜 Toque familiar")}.onSuccess{notice="Toque familiar enviado. Aparece en Mensajes del grupo."}.onFailure{error=it.message}}},Modifier.fillMaxWidth().height(54.dp)){Text("💜 ENVIAR TOQUE FAMILIAR")}
                     }
                     item {
                         Button(onClick={scope.launch{runCatching{api.sendEvent(session,me.familyId,me.id,"need_me")}.onSuccess{notice="Prueba TE NECESITO registrada; no se enviaron alertas externas"}.onFailure{error=it.message}}},Modifier.fillMaxWidth().height(58.dp),colors=ButtonDefaults.buttonColors(containerColor=TfCoral)){Text("TE NECESITO · PRUEBA",fontWeight=FontWeight.Black)}
                     }
                 }
-                1 -> RealFamilyMap()
+                1 -> SharedFamilyMap(session,me,members)
+                2 -> SyncedMessages(session,me,members)
                 else -> PrivacyScreen(session,api,me,members) { error=it }
             }
             error?.let { AlertDialog(onDismissRequest={error=null},title={Text("No se pudo completar")},text={Text(it)},confirmButton={TextButton(onClick={error=null}){Text("Entendido")}}) }
@@ -253,28 +264,31 @@ private fun FamilyDashboard(session: UserSession, me: FamilyMember, onExit: () -
 @Composable
 private fun PrivacyScreen(session:UserSession,api:SupabaseService,me:FamilyMember,members:List<FamilyMember>,onError:(String)->Unit){
     val scope=rememberCoroutineScope()
-    var modes by remember { mutableStateOf(mapOf<String,String>()) }
+    var modes by remember{mutableStateOf(mapOf<String,String>())}
+    var loading by remember{mutableStateOf(true)}
+    var saving by remember{mutableStateOf<String?>(null)}
+    LaunchedEffect(me.id){runCatching{api.visibility(session,me.id)}.onSuccess{modes=it}.onFailure{onError(it.message?:"Error")};loading=false}
     val adults=members.filter{it.id!=me.id && it.relationship in listOf("padre","madre","tutor")}
     LazyColumn(contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-        item { Text("Privacidad entre adultos",fontSize=26.sp,fontWeight=FontWeight.Black);Text("Tu configuración no elimina al otro progenitor ni afecta su vínculo con los hijos.",color=TfInk.copy(alpha=.6f)) }
-        items(adults){target ->
-            val mode=modes[target.id] ?: "visible"
-            Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=Color.White)){
+        item{Text("Privacidad entre adultos",fontSize=26.sp,fontWeight=FontWeight.Black)
+            Text("Controlas quién puede consultar TU ubicación. Los adultos están ocultos por defecto. Esto no elimina el acceso autorizado de cada progenitor a los hijos.")}
+        if(loading) item{CircularProgressIndicator()}
+        items(adults){target->
+            val mode=modes[target.id]?:"hidden"
+            Card(Modifier.fillMaxWidth()){
                 Column(Modifier.padding(16.dp)){
-                    Text(target.name,fontWeight=FontWeight.Bold)
-                    Text("Visibilidad actual: ${mode.replace('_',' ')}",fontSize=13.sp)
-                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(5.dp)){
-                        listOf("visible","children_only","hidden","blocked").forEach{choice ->
-                            FilterChip(mode==choice,{
-                                modes=modes+(target.id to choice)
-                                scope.launch{runCatching{api.setVisibility(session,me.familyId,me.id,target.id,choice)}.onFailure{onError(it.message?:"Error")}}
-                            },{Text(when(choice){"children_only"->"Solo hijos";"hidden"->"Oculto";"blocked"->"Bloqueado";else->"Visible"},fontSize=10.sp)})
-                        }
+                    Text("Mi ubicación para "+target.name,fontWeight=FontWeight.Bold)
+                    listOf("visible","children_only","hidden","blocked").forEach{choice->
+                        FilterChip(selected=mode==choice,enabled=!loading && saving==null,onClick={
+                            saving=target.id
+                            scope.launch{runCatching{api.setVisibility(session,me.familyId,me.id,target.id,choice)}
+                                .onSuccess{modes=modes+(target.id to choice)}.onFailure{onError(it.message?:"No se guardó el cambio")};saving=null}
+                        },label={Text(when(choice){"visible"->"Compartir mi ubicación con esta persona";"children_only"->"Solo hijos; no compartir con este adulto";"blocked"->"Bloquear ubicación y mensajes entre ambos";else->"No compartir mi ubicación"})})
                     }
                 }
             }
         }
-        if(adults.isEmpty()) item { Text("Cuando otro padre, madre o tutor se una, podrás configurar aquí su visibilidad.") }
+        if(adults.isEmpty()) item{Text("Aquí aparecerán los otros padres o tutores cuando se unan.")}
     }
 }
 
@@ -297,3 +311,31 @@ private fun FamilyDialog(family:FamilyInfo,onDismiss:()->Unit,onSave:(String,Str
 
 @Composable
 private fun ErrorScreen(message:String,onRetry:()->Unit){Box(Modifier.fillMaxSize().padding(28.dp),contentAlignment=Alignment.Center){Column(horizontalAlignment=Alignment.CenterHorizontally){Text("No pudimos cargar la familia",fontWeight=FontWeight.Bold,fontSize=22.sp);Text(message,textAlign=TextAlign.Center,modifier=Modifier.padding(12.dp));Button(onClick=onRetry){Text("Reintentar")}}}}
+
+@Composable
+private fun MemberEditDialog(session:UserSession,target:FamilyMember,canChangeRelation:Boolean,onDismiss:()->Unit,onSave:(String,String,String?,String?,String?)->Unit){
+    var name by remember{mutableStateOf(target.name)}
+    var relation by remember{mutableStateOf(target.relationship)}
+    var birth by remember{mutableStateOf(target.birthDate.orEmpty())}
+    var phone by remember{mutableStateOf(target.phone.orEmpty())}
+    var photo by remember{mutableStateOf(target.avatarUrl)}
+    val dateValid=birth.isBlank() || runCatching{java.time.LocalDate.parse(birth)}.isSuccess
+    AlertDialog(onDismissRequest=onDismiss,title={Text("Editar integrante")},text={
+        Column(Modifier.heightIn(max=460.dp).verticalScroll(rememberScrollState())){
+            PickFamilyPhoto(session,target.familyId,photo){photo=it}
+            OutlinedTextField(name,{name=it.take(100)},label={Text("Nombre")})
+            OutlinedTextField(birth,{birth=it.take(10)},label={Text("Nacimiento: AAAA-MM-DD")},isError=!dateValid)
+            OutlinedTextField(phone,{phone=it.take(30)},label={Text("Teléfono (opcional)")})
+            if(canChangeRelation) RelationshipPicker(relation){relation=it} else Text("Relación: "+relation+" · cambios mediante administrador")
+        }
+    },confirmButton={Button(enabled=name.isNotBlank() && dateValid,onClick={onSave(name.trim(),relation,birth.ifBlank{null},phone.ifBlank{null},photo)}){Text("Guardar")}},dismissButton={TextButton(onClick=onDismiss){Text("Cancelar")}})
+}
+
+@Composable
+private fun FamilyPhotoDialog(session:UserSession,family:FamilyInfo,onDismiss:()->Unit,onSave:(String,String?)->Unit){
+    var name by remember{mutableStateOf(family.name)}
+    var photo by remember{mutableStateOf(family.photoUrl)}
+    AlertDialog(onDismissRequest=onDismiss,title={Text("Editar grupo familiar")},text={
+        Column{PickFamilyPhoto(session,family.id,photo){photo=it};OutlinedTextField(name,{name=it.take(100)},label={Text("Nombre de la familia")})}
+    },confirmButton={Button(enabled=name.isNotBlank(),onClick={onSave(name.trim(),photo)}){Text("Guardar")}},dismissButton={TextButton(onClick=onDismiss){Text("Cancelar")}})
+}

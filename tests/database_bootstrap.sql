@@ -1,0 +1,15 @@
+create role authenticated nologin;
+create role anon nologin;
+create schema auth;
+create schema storage;
+create table auth.users(id uuid primary key);
+create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid; $$;
+grant usage on schema auth,storage,public to authenticated,anon;
+grant execute on function auth.uid() to authenticated,anon;
+alter default privileges in schema public grant select,insert,update,delete on tables to authenticated;
+create table storage.buckets(id text primary key,name text,public boolean default false);
+create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text,name text);
+alter table storage.objects enable row level security;
+grant select,insert,update,delete on storage.objects to authenticated;
+create function storage.foldername(name text) returns text[] language sql immutable as $$ select (string_to_array(name,'/'))[1:array_length(string_to_array(name,'/'),1)-1]; $$;
+create publication supabase_realtime;

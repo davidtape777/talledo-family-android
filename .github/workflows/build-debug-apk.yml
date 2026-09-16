@@ -9,7 +9,34 @@ permissions:
   contents: read
 
 jobs:
+  database-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: test-only-password
+          POSTGRES_DB: talledo_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      PGPASSWORD: test-only-password
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test migrations and access rules
+        run: |
+          psql -h localhost -U postgres -d talledo_test -v ON_ERROR_STOP=1 -f tests/database_bootstrap.sql
+          psql -h localhost -U postgres -d talledo_test -v ON_ERROR_STOP=1 -f supabase/migrations/001_family_schema.sql
+          psql -h localhost -U postgres -d talledo_test -v ON_ERROR_STOP=1 -f supabase/migrations/002_enforce_adult_visibility.sql
+          psql -h localhost -U postgres -d talledo_test -v ON_ERROR_STOP=1 -f supabase/migrations/003_shared_location_and_security.sql
+          psql -h localhost -U postgres -d talledo_test -v ON_ERROR_STOP=1 -f tests/database_security.sql
+
   build:
+    needs: database-tests
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
@@ -38,6 +65,12 @@ jobs:
         with:
           gradle-version: "8.10.2"
 
+      - name: Restore debug signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: talledo-family-debug-signing-v1
+
       - name: Run unit tests
         run: gradle --no-daemon -PMAPS_API_KEY="$MAPS_API_KEY" testDebugUnitTest
 
@@ -45,12 +78,12 @@ jobs:
         run: gradle --no-daemon -PMAPS_API_KEY="$MAPS_API_KEY" assembleDebug
 
       - name: Prepare named APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk TALLEDO-FAMILY-v3-debug.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk TALLEDO-FAMILY-v4-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: TALLEDO-FAMILY-v3-debug-apk
-          path: TALLEDO-FAMILY-v3-debug.apk
+          name: TALLEDO-FAMILY-v4-debug-apk
+          path: TALLEDO-FAMILY-v4-debug.apk
           if-no-files-found: error
           retention-days: 30

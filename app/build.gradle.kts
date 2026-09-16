@@ -15,8 +15,8 @@ android {
         applicationId = "com.talledofamily.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "3.0-location-preview"
+        versionCode = 4
+        versionName = "4.0-family-test"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey.get()
@@ -43,6 +43,7 @@ dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.01.01"))
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation("androidx.activity:activity-compose:1.10.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
