@@ -16,8 +16,9 @@ import java.net.URL
 /** Tokens cifrados con Android Keystore; nunca guarda contraseñas. */
 object SessionVault {
     private lateinit var prefs: android.content.SharedPreferences
-    private var session: UserSession? = null
+    @Volatile private var session: UserSession? = null
     private val lock=Any()
+    private val refreshLock=Any()
     fun initialize(context:Context) = synchronized(lock) {
         prefs=context.applicationContext.getSharedPreferences("tf_secure_session",Context.MODE_PRIVATE)
         LocationSharing.pendingPause=prefs.getBoolean("pending_pause",false)
@@ -39,7 +40,7 @@ object SessionVault {
         }.generateKey()
     }
     fun markPausePending(value:Boolean) { prefs.edit().putBoolean("pending_pause",value).commit() }
-    fun current():UserSession?=synchronized(lock){session}
+    fun current():UserSession?=session
     fun save(value:UserSession)=synchronized(lock) {
         val o=JSONObject().put("access",value.accessToken).put("refresh",value.refreshToken).put("user",value.userId).put("expires",value.expiresAt)
         val c=Cipher.getInstance("AES/GCM/NoPadding"); c.init(Cipher.ENCRYPT_MODE,key())
@@ -48,8 +49,8 @@ object SessionVault {
     }
     fun clear()=synchronized(lock){ session=null; prefs.edit().remove("session").commit(); Unit }
     /** Refresh serializado para no reutilizar refresh tokens desde UI y servicio. Ejecutar en IO. */
-    fun token(fallback:String):String=synchronized(lock) {
-        val old=session ?: return@synchronized fallback
+    fun token(fallback:String):String=synchronized(refreshLock) {
+        val old=session ?: throw SupabaseException("Inicia sesión nuevamente")
         if(old.expiresAt>System.currentTimeMillis()/1000+60) return@synchronized old.accessToken
         val c=URL(BuildConfig.SUPABASE_URL+"/auth/v1/token?grant_type=refresh_token").openConnection() as HttpURLConnection
         c.requestMethod="POST";c.connectTimeout=15000;c.readTimeout=20000;c.doOutput=true
@@ -59,7 +60,11 @@ object SessionVault {
             if(c.responseCode !in 200..299) throw SupabaseException("No se pudo renovar la sesión. Reintenta o vuelve a iniciar sesión.")
             val o=JSONObject(c.inputStream.bufferedReader().use{it.readText()})
             val updated=UserSession(o.getString("access_token"),o.getString("refresh_token"),old.userId,o.optLong("expires_at",System.currentTimeMillis()/1000+o.optLong("expires_in",3600)))
-            save(updated);updated.accessToken
+            synchronized(lock) {
+                if(session?.refreshToken!=old.refreshToken) throw SupabaseException("La sesión cambió; inicia sesión nuevamente")
+                save(updated)
+            }
+            updated.accessToken
         } finally {c.disconnect()}
     }
 }
