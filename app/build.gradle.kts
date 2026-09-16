@@ -15,8 +15,8 @@ android {
         applicationId = "com.talledofamily.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "4.0-family-test"
+        versionCode = 5
+        versionName = "5.0-optional-offline-map"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey.get()
@@ -36,6 +36,7 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true; buildConfig = true }
+    testOptions.unitTests.isIncludeAndroidResources = true
     packaging.resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
 }
 
@@ -55,4 +56,5 @@ dependencies {
     implementation("com.google.firebase:firebase-messaging")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
 }

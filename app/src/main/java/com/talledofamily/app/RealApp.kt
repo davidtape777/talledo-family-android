@@ -34,10 +34,19 @@ private val relationships = listOf("padre", "madre", "hijo", "hija", "tutor", "o
 fun RealTalledoFamilyApp() {
     MaterialTheme(colorScheme = lightColorScheme(primary = TfPurple, secondary = TfCoral, tertiary = TfMint, background = TfCream)) {
         var session by remember { mutableStateOf<UserSession?>(SessionVault.current()) }
+        var offlineMap by rememberSaveable { mutableStateOf(false) }
         val context=androidx.compose.ui.platform.LocalContext.current
-        Surface(Modifier.fillMaxSize(), color = TfCream) {
-            if (session == null) AuthScreen { session = it }
-            else ConnectedApp(session!!, onExit = { SessionVault.clear(); session = null })
+        Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing), color = TfCream) {
+            if (offlineMap) OfflineMapScreen { offlineMap = false }
+            else Column(Modifier.fillMaxSize()) {
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    if (session == null) AuthScreen { session = it }
+                    else ConnectedApp(session!!, onExit = { SessionVault.clear(); session = null })
+                }
+                TextButton(onClick = { offlineMap = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("MAPA SIN CONEXIÓN · OPCIONAL")
+                }
+            }
         }
     }
 }

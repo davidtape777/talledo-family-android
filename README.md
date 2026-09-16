@@ -1,10 +1,14 @@
-# TALLEDO FAMILY — v4, candidata para pruebas familiares
+# TALLEDO FAMILY — v5, mapa local opcional
 
 Android Kotlin/Compose, Supabase y Google Maps. APK Debug construido por GitHub Actions.
 
+## Nuevo en v5
+
+**MAPA SIN CONEXIÓN · OPCIONAL** permite importar un MBTiles raster autorizado, mover/acercar el mapa y consultar el GPS propio sin red. Google Maps, familia, mensajes y privacidad no se reemplazan. No hay nueva migración SQL, cuenta ni servicio de pago. El ZIP incluye una cuadrícula sintética para probar, no un mapa real de calles. [Guía y límites](docs/OFFLINE_MAPS.md).
+
 ## Activación
 1. En el proyecto Supabase ya configurado, ejecutar únicamente `supabase/migrations/003_shared_location_and_security.sql` después de 001 y 002.
-2. Descargar el artefacto v4 desde Actions y extraer el APK.
+2. Descargar el artefacto v5 desde Actions y extraer el APK.
 3. Instalar en dos teléfonos; si hay conflicto de firma, desinstalar la versión previa (se conserva la familia en Supabase; se borra la sesión local).
 4. Usar DOS cuentas distintas; la primera crea la familia, la segunda elige Unirme y usa el código familiar.
 5. Si la segunda cuenta elige padre/madre/tutor, el administrador pulsa Autorizar acceso parental en Familia.
