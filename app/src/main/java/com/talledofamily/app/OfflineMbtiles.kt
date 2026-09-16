@@ -68,7 +68,13 @@ internal class OfflineMbtiles(file: File) : AutoCloseable {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
             if (bounds.outWidth !in 1..1024 || bounds.outHeight !in 1..1024) return@use null
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.RGB_565 })
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply {
+                inPreferredConfig = Bitmap.Config.RGB_565
+                // The viewer uses 256-pixel tiles; keep even large source tiles bounded.
+                var sample = 1
+                while (bounds.outWidth / sample > 256 || bounds.outHeight / sample > 256) sample *= 2
+                inSampleSize = sample
+            })
         }
     }
     @Synchronized override fun close() = db.close()

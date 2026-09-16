@@ -70,6 +70,9 @@ fun OfflineMapScreen(onClose: () -> Unit) {
                 if(SystemClock.elapsedRealtimeNanos()-fix.elapsedRealtimeNanos < 120_000_000_000L) location=fix
             }
             override fun onProviderDisabled(provider:String) { location=null; error="Activa la ubicación GPS del dispositivo." }
+            override fun onProviderEnabled(provider:String) { error=null }
+            @Deprecated("Required by Android 8-10 LocationListener")
+            override fun onStatusChanged(provider:String?,status:Int,extras:android.os.Bundle?) {}
         }
         fun stop() { if(listening) manager.removeUpdates(listener); listening=false; location=null }
         fun start() {

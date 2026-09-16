@@ -98,4 +98,29 @@ class OfflineMbtilesTest {
         SQLiteDatabase.openDatabase(f.path,null,SQLiteDatabase.OPEN_READWRITE).use { it.execSQL("INSERT INTO metadata VALUES ('scheme','xyz')") }
         assertTrue(runCatching { OfflineMbtiles(f).close() }.isFailure)
     }
+    @Test
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun viewerRendersLocalRaster() {
+        val info=OfflineMapStore.import(context,Uri.fromFile(fixture()))
+        val controller=org.robolectric.Robolectric.buildActivity(android.app.Activity::class.java).setup()
+        val activity=controller.get()
+        val view=OfflineMapView(activity,info)
+        activity.setContentView(view)
+        view.layout(0,0,128,128)
+        val image=Bitmap.createBitmap(128,128,Bitmap.Config.ARGB_8888)
+        var rendered=false
+        try {
+            val deadline=System.nanoTime()+10_000_000_000L
+            while(!rendered && System.nanoTime()<deadline) {
+                org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(100))
+                view.draw(android.graphics.Canvas(image))
+                rendered=image.getPixel(64,64)==Color.RED
+                if(!rendered) Thread.sleep(20)
+            }
+            assertTrue("The local raster should be drawn without any map SDK or tile server",rendered)
+        } finally {
+            activity.setContentView(android.view.View(activity))
+            controller.pause().stop().destroy(); image.recycle()
+        }
+    }
 }
