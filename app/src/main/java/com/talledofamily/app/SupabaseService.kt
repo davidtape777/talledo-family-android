@@ -8,7 +8,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 data class UserSession(val accessToken: String, val refreshToken: String, val userId: String, val expiresAt: Long = 0)
-data class FamilyMember(val id: String, val familyId: String, val authUserId: String?, val name: String, val relationship: String, val role: String, val avatarUrl: String?, val birthDate: String? = null, val phone: String? = null)
+data class FamilyMember(val id: String, val familyId: String, val authUserId: String?, val name: String, val relationship: String, val role: String, val avatarUrl: String?, val birthDate: String? = null, val phone: String? = null, val privacyPermitted: Boolean = true)
 data class FamilyInfo(val id: String, val name: String, val joinCode: String, val photoUrl: String?)
 data class SharedLocation(val memberId:String,val sharing:Boolean,val latitude:Double,val longitude:Double,val accuracy:Double,val capturedAt:String)
 data class FamilyMessage(val id:String,val senderId:String,val body:String,val createdAt:String)
@@ -140,7 +140,7 @@ class SupabaseService {
         o.getString("display_name"), o.getString("relationship"), o.getString("role"),
         o.optString("avatar_url").takeIf { it.isNotBlank() && it != "null" },
         o.optString("birth_date").takeIf { it.isNotBlank() && it != "null" },
-        o.optString("phone").takeIf { it.isNotBlank() && it != "null" }
+        o.optString("phone").takeIf { it.isNotBlank() && it != "null" }, o.optBoolean("privacy_permitted",true)
     )
 
     private fun familyFrom(o: JSONObject) = FamilyInfo(

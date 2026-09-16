@@ -230,7 +230,7 @@ private fun FamilyDashboard(session: UserSession, me: FamilyMember, onExit: () -
                             }
                         }
                     }
-                    items(members){member ->
+                    items(members.filter { it.id==me.id || it.relationship in listOf("hijo","hija") || it.privacyPermitted }){member ->
                         Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=Color.White)){
                             Row(Modifier.padding(15.dp),verticalAlignment=Alignment.CenterVertically){
                                 Surface(Modifier.size(48.dp),CircleShape,color=TfPurple.copy(alpha=.13f)){Box(contentAlignment=Alignment.Center){Text(member.name.take(1).uppercase(),fontWeight=FontWeight.Black,color=TfPurple)}}
@@ -268,7 +268,7 @@ private fun PrivacyScreen(session:UserSession,api:SupabaseService,me:FamilyMembe
     var loading by remember{mutableStateOf(true)}
     var saving by remember{mutableStateOf<String?>(null)}
     LaunchedEffect(me.id){runCatching{api.visibility(session,me.id)}.onSuccess{modes=it}.onFailure{onError(it.message?:"Error")};loading=false}
-    val adults=members.filter{it.id!=me.id && it.relationship in listOf("padre","madre","tutor")}
+    val adults=if(me.relationship in listOf("hijo","hija")) emptyList() else members.filter{it.id!=me.id && it.relationship in listOf("padre","madre","tutor")}
     LazyColumn(contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
         item{Text("Privacidad entre adultos",fontSize=26.sp,fontWeight=FontWeight.Black)
             Text("Controlas quién puede consultar TU ubicación. Los adultos están ocultos por defecto. Esto no elimina el acceso autorizado de cada progenitor a los hijos.")}
@@ -288,7 +288,7 @@ private fun PrivacyScreen(session:UserSession,api:SupabaseService,me:FamilyMembe
                 }
             }
         }
-        if(adults.isEmpty()) item{Text("Aquí aparecerán los otros padres o tutores cuando se unan.")}
+        if(adults.isEmpty()) item{Text(if(me.relationship in listOf("hijo","hija")) "Tus padres/tutores autorizados pueden ver tu ubicación cuando la activas. Puedes pausar la ubicación en Mapa." else "Aquí aparecerán los otros padres o tutores cuando se unan.")}
     }
 }
 

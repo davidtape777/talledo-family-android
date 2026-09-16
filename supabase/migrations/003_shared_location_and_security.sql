@@ -5,9 +5,9 @@ returns boolean language sql stable security definer set search_path = public
 as $$ select exists(select 1 from public.family_members where family_id=fid and auth_user_id=auth.uid() and role in ('admin','adult') and relationship in ('padre','madre','tutor')); $$;
 
 create or replace function public.member_in_family(mid uuid,fid uuid)
-returns boolean language sql stable security definer set search_path=public as $
+returns boolean language sql stable security definer set search_path=public as $$
  select exists(select 1 from public.family_members where id=mid and family_id=fid);
-$;
+$$;
 -- Un integrante no puede cambiar su rol, usuario, familia ni relación mediante REST.
 revoke update on public.family_members from authenticated, anon;
 grant update(display_name,birth_date,phone,avatar_url,relationship) on public.family_members to authenticated;
@@ -19,7 +19,7 @@ begin
   if (new.role<>old.role or new.relationship<>old.relationship) and not public.is_family_admin(old.family_id) then raise exception 'Solo el administrador autoriza relaciones y accesos'; end if;
  end if;
  return new;
-end; $;
+end; $$;
 drop trigger if exists protect_membership on public.family_members;
 create trigger protect_membership before update on public.family_members for each row execute function public.protect_membership();
 
@@ -94,17 +94,17 @@ drop policy if exists "members read permitted members" on public.family_members;
 create policy "members read permitted members" on public.family_members for select to authenticated
  using(public.can_read_location(id,family_id));
 create or replace function public.list_family_members(fid uuid)
-returns setof jsonb language plpgsql stable security definer set search_path=public as $
+returns setof jsonb language plpgsql stable security definer set search_path=public as $$
 begin
  if not public.is_family_member(fid) then raise exception 'No autorizado'; end if;
  return query select jsonb_build_object(
  'id',m.id,'family_id',m.family_id,'auth_user_id',m.auth_user_id,
- 'display_name',m.display_name,'relationship',m.relationship,'role',m.role,
+ 'display_name',m.display_name,'relationship',m.relationship,'role',m.role,'privacy_permitted',public.can_read_location(m.id,fid),
  'birth_date',case when public.can_read_location(m.id,fid) then m.birth_date else null end,
  'phone',case when public.can_read_location(m.id,fid) then m.phone else null end,
  'avatar_url',case when public.can_read_location(m.id,fid) then m.avatar_url else null end)
  from public.family_members m where m.family_id=fid order by m.created_at;
-end; $;
+end; $$;
 revoke all on function public.list_family_members(uuid) from public,anon;
 grant execute on function public.list_family_members(uuid) to authenticated;
 create table if not exists public.family_locations(
