@@ -27,5 +27,12 @@ class TalledoMessagingService:FirebaseMessagingService() {
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE).setAutoCancel(true).setContentIntent(open).build()
         // Same outbox ID replaces duplicates; never speak or expose GPS/message text on lock screen.
         manager.notify(id.hashCode(),notification)
+        val prefs=getSharedPreferences("family_voice_${session.userId}",MODE_PRIVATE)
+        val locked=getSystemService(android.app.KeyguardManager::class.java).isDeviceLocked
+        if(message.priority==RemoteMessage.PRIORITY_HIGH && message.data["kind"]=="message" &&
+            canReadBackground(prefs.getBoolean("enabled",false),prefs.getBoolean("messages",false),prefs.getBoolean("background",false),FamilyVoicePresence.foreground,locked)) {
+            // Never put private text in intents or FCM. Failure leaves the normal notification intact.
+            runCatching{androidx.core.content.ContextCompat.startForegroundService(this,Intent(this,FamilyVoiceService::class.java).putExtra("notice_id",id).putExtra("user_id",session.userId))}
+        }
     }
 }

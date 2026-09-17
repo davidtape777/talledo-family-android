@@ -26,6 +26,7 @@ fun FamilyAlertsScreen(session:UserSession,me:FamilyMember,notices:List<FamilyNo
     var error by remember{mutableStateOf<String?>(null)}
     var enabled by remember{mutableStateOf(voice.enabled)}
     var messages by remember{mutableStateOf(voice.readMessages)}
+    var background by remember{mutableStateOf(voice.readInBackground)}
     var quiet by remember{mutableStateOf(voice.quiet)}
     var volume by remember{mutableFloatStateOf(voice.volume)}
     var voiceStatus by remember{mutableStateOf(voice.status)}
@@ -46,10 +47,11 @@ fun FamilyAlertsScreen(session:UserSession,me:FamilyMember,notices:List<FamilyNo
             Row{Text("Voz española",Modifier.weight(1f));Switch(enabled,{enabled=it;voice.enabled=it})}
             Text(voiceStatus,style=MaterialTheme.typography.bodySmall)
             Row{Text("Leer también mensajes",Modifier.weight(1f));Switch(messages,{messages=it;voice.readMessages=it})}
+            Row{Text("Leer mensajes en segundo plano",Modifier.weight(1f));Switch(background,{background=it;voice.readInBackground=it;if(!it) context.stopService(Intent(context,FamilyVoiceService::class.java))})}
             Row{Text("Silencio de 22:00 a 07:00",Modifier.weight(1f));Switch(quiet,{quiet=it;voice.quiet=it})}
             Text("Volumen de voz: ${(volume*100).toInt()} %")
             Slider(volume,{volume=it;voice.volume=it},valueRange=.1f..1f)
-            Text("Solo habla con la app abierta y el teléfono desbloqueado. Respeta modo silencio y No molestar. No necesita micrófono.",style=MaterialTheme.typography.bodySmall)
+            Text("Con la opción de segundo plano puede leer mensajes nuevos mientras usas otra app. Activa también Voz española y Leer también mensajes. Solo con pantalla desbloqueada; respeta silencio y No molestar. Durante la lectura muestra un aviso para detenerla. No necesita micrófono.",style=MaterialTheme.typography.bodySmall)
             TextButton(onClick={voice.speak("Hola, soy el asistente de Talledo Family. Tu familia está conectada.")}){Text("PROBAR VOZ")}
             TextButton(onClick={context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))}){Text("AJUSTES DE VOZ DE ANDROID")}
         }}}

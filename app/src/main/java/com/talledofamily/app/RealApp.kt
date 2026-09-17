@@ -230,7 +230,7 @@ private fun FamilyDashboard(session: UserSession, me: FamilyMember, onExit: () -
                     notices=rows
                     val new=rows.filter{!it.read && it.id !in announced && runCatching{java.time.Instant.parse(it.createdAt).isAfter(since) && recentFamilyFix(it.createdAt)}.getOrDefault(false)}
                     new.forEach{announced.add(it.id)}
-                    new.firstOrNull{it.kind!="message" || voice.readMessages}?.let{voice.speak(it.text,it.kind=="message")}
+                    new.firstOrNull{it.kind!="message" || voice.readMessages}?.let{voice.speak(it.text,it.kind=="message",it.id)}
                 }
             }
             delay(10000)

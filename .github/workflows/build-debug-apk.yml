@@ -91,7 +91,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: TALLEDO-FAMILY-v6-test-reports
+          name: TALLEDO-FAMILY-v7-test-reports
           path: |
             app/build/test-results/testDebugUnitTest/
             app/build/reports/tests/testDebugUnitTest/
@@ -102,7 +102,7 @@ jobs:
         run: gradle --no-daemon -PMAPS_API_KEY="$MAPS_API_KEY" assembleDebug
 
       - name: Prepare named APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk TALLEDO-FAMILY-v6-debug.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk TALLEDO-FAMILY-v7-debug.apk
 
       - name: Generate synthetic offline demo
         run: python3 tests/create_offline_demo.py TALLEDO-DEMO-sin-calles.mbtiles
@@ -110,9 +110,9 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: TALLEDO-FAMILY-v6-debug-apk
+          name: TALLEDO-FAMILY-v7-debug-apk
           path: |
-            TALLEDO-FAMILY-v6-debug.apk
+            TALLEDO-FAMILY-v7-debug.apk
             TALLEDO-DEMO-sin-calles.mbtiles
             docs/OFFLINE_MAPS.md
             docs/ACTIVATE_ALERTS.md

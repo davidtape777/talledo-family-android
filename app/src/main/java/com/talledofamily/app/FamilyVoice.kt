@@ -16,8 +16,11 @@ import java.time.Duration
 fun inQuietHours(hour:Int,start:Int,end:Int):Boolean = if(start==end) false else if(start<end) hour in start until end else hour>=start || hour<end
 fun recentFamilyFix(captured:String,now:Instant=Instant.now()):Boolean = runCatching {Duration.between(Instant.parse(captured),now).seconds in 0..119}.getOrDefault(false)
 
-// TTS stays foreground-only. No microphones, cloud voice service or background speech.
-class FamilyVoice(private val context:Context,userId:String) {
+object FamilyVoicePresence { @Volatile var foreground=false }
+fun canReadBackground(enabled:Boolean,messages:Boolean,background:Boolean,foreground:Boolean,locked:Boolean):Boolean = enabled && messages && background && !foreground && !locked
+
+// Background callers must run in the bounded, visible media playback service.
+class FamilyVoice(private val context:Context,userId:String,private val background:Boolean=false) {
     private val preferences=context.getSharedPreferences("family_voice_$userId",Context.MODE_PRIVATE)
     private val audio=context.getSystemService(AudioManager::class.java)
     private val attributes=AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()
@@ -29,6 +32,9 @@ class FamilyVoice(private val context:Context,userId:String) {
     var readMessages:Boolean
         get()=preferences.getBoolean("messages",false)
         set(value){preferences.edit().putBoolean("messages",value).apply()}
+    var readInBackground:Boolean
+        get()=preferences.getBoolean("background",false)
+        set(value){preferences.edit().putBoolean("background",value).apply()}
     var quiet:Boolean
         get()=preferences.getBoolean("quiet",true)
         set(value){preferences.edit().putBoolean("quiet",value).apply()}
@@ -36,6 +42,9 @@ class FamilyVoice(private val context:Context,userId:String) {
         get()=preferences.getFloat("volume",.7f)
         set(value){preferences.edit().putFloat("volume",value.coerceIn(.1f,1f)).apply()}
     var active=false
+        set(value){field=value;if(!background) FamilyVoicePresence.foreground=value}
+    val isReady get()=ready
+    val isSpeaking get()=currentUtterance!=null
     var status="Preparando voz española instalada…"
         private set
     private var ready=false
@@ -58,15 +67,23 @@ class FamilyVoice(private val context:Context,userId:String) {
             } else if(!disposed) status="Voz no disponible en este dispositivo"
         }
     }
-    fun speak(text:String,message:Boolean=false) {
-        if(!ready || !active || !enabled || (message && !readMessages)) return
-        if(quiet && inQuietHours(java.time.LocalTime.now().hour,22,7)) return
-        if(context.getSystemService(KeyguardManager::class.java).isDeviceLocked) return
-        if(context.getSystemService(AudioManager::class.java).ringerMode!=AudioManager.RINGER_MODE_NORMAL) return
-        if(context.getSystemService(NotificationManager::class.java).currentInterruptionFilter!=NotificationManager.INTERRUPTION_FILTER_ALL) return
-        if(audio.requestAudioFocus(focus)!=AudioManager.AUDIOFOCUS_REQUEST_GRANTED) return
+    fun allowed(message:Boolean):Boolean {
+        if(!active || !enabled || (message && !readMessages)) return false
+        if(background && (!readInBackground || FamilyVoicePresence.foreground || !message)) return false
+        if(quiet && inQuietHours(java.time.LocalTime.now().hour,22,7)) return false
+        if(context.getSystemService(KeyguardManager::class.java).isDeviceLocked) return false
+        if(audio.ringerMode!=AudioManager.RINGER_MODE_NORMAL) return false
+        if(context.getSystemService(NotificationManager::class.java).currentInterruptionFilter!=NotificationManager.INTERRUPTION_FILTER_ALL) return false
+        return true
+    }
+    fun speak(text:String,message:Boolean=false,noticeId:String?=null):Boolean {
+        if(!ready || !allowed(message)) return false
+        if(noticeId!=null && preferences.getStringSet("spoken",emptySet())!!.contains(noticeId)) return false
+        if(audio.requestAudioFocus(focus)!=AudioManager.AUDIOFOCUS_REQUEST_GRANTED) return false
         val id=java.util.UUID.randomUUID().toString();currentUtterance=id
-        if(tts?.speak(text.take(1000),TextToSpeech.QUEUE_FLUSH,Bundle().apply{putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME,volume)},id)!=TextToSpeech.SUCCESS) audio.abandonAudioFocusRequest(focus)
+        if(tts?.speak(text.take(1000),TextToSpeech.QUEUE_FLUSH,Bundle().apply{putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME,volume)},id)!=TextToSpeech.SUCCESS){stop();return false}
+        if(noticeId!=null){val ids=preferences.getStringSet("spoken",emptySet())!!.toList().takeLast(99).toMutableSet();ids.add(noticeId);preferences.edit().putStringSet("spoken",ids).apply()}
+        return true
     }
     fun stop(){currentUtterance=null;tts?.stop();audio.abandonAudioFocusRequest(focus)}
     fun close(){disposed=true;active=false;stop();tts?.shutdown();tts=null}

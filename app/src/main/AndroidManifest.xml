@@ -7,6 +7,7 @@
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <queries><intent><action android:name="android.intent.action.TTS_SERVICE" /></intent></queries>
     <application
         android:allowBackup="false"
@@ -26,6 +27,7 @@
             </intent-filter>
         </service>
         <service android:name=".LocationShareService" android:exported="false" android:foregroundServiceType="location" />
+        <service android:name=".FamilyVoiceService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
         <activity
             android:name=".RealMainActivity"
             android:exported="true"

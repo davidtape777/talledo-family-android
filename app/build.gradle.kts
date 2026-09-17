@@ -15,8 +15,8 @@ android {
         applicationId = "com.talledofamily.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 6
-        versionName = "6.0-family-voice-and-alerts"
+        versionCode = 7
+        versionName = "7.0-background-message-voice"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey.get()

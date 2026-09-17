@@ -1,4 +1,18 @@
-# TALLEDO FAMILY v6 — activar voz y avisos reales
+# TALLEDO FAMILY v7 — voz opcional en segundo plano
+
+## Actualización desde v6 (servidor ya probado)
+
+Instala `TALLEDO-FAMILY-v7-debug.apk` sobre v6 en ambos dispositivos. No desinstales ni repitas SQL, secretos o webhook. Mantiene paquete y firma Debug de CI. Sigue siendo una candidata de pruebas, no un APK Release definitivo.
+
+En Avisos, activa **Voz española**, **Leer también mensajes** y **Leer mensajes en segundo plano**. La nueva opción viene apagada. Requiere una voz española local instalada. Si pruebas de noche, el silencio de 22:00 a 07:00 impide la lectura.
+
+Usando otra aplicación con el destinatario desbloqueado, envía un mensaje nuevo desde el otro dispositivo. Debe llegar el aviso genérico y, si Android permite el servicio, la voz. Durante la lectura aparece un aviso sin texto privado con **DETENER**. Bloquear la pantalla, cerrar sesión, desactivar las opciones o activar silencio/No molestar detiene la lectura. No pide micrófono ni añade proveedor de voz.
+
+Obtiene el texto autorizado desde Supabase con la sesión del destinatario; el push sigue sin contenido privado. Solo lee mensajes recientes (menos de dos minutos), no estados de ubicación en segundo plano ni mensajes anteriores al habilitar la opción. Deduplica IDs localmente sin guardar texto. Lectura máxima 30 segundos; si llegan varias a la vez, el último puede interrumpir el anterior. El aviso normal permanece si falla voz, conexión o permisos.
+
+Pruebas reales necesarias: ambos sentidos de envío usando otra app; opción apagada (solo aviso); pantalla bloqueada, No molestar y silencio nocturno (sin voz); regreso a la app (sin repetir el mensaje leído); botón DETENER. Las pruebas automáticas no prueban estas condiciones del hardware.
+
+Es un servicio temporal, visible y no reiniciable; solo se intenta con FCM recibido de alta prioridad. Ahorro de batería, prioridad degradada, cierre forzado o Android pueden impedirlo. No promete lectura garantizada ni voz con pantalla apagada. Los pasos siguientes son referencia de instalación inicial: si tu servidor ya funciona, no los repitas.
 
 Esta es una candidata Debug para probar en dos dispositivos, no una publicación de producción ni un servicio de emergencia. No contiene videollamadas. El mapa sin conexión sigue siendo una opción separada, sin sustituir Google Maps ni sincronizar GPS sin Internet.
 
