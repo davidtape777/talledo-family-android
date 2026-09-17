@@ -33,10 +33,23 @@ jobs:
           psql -h localhost -U postgres -d talledo_test -v ON_ERROR_STOP=1 -f supabase/migrations/001_family_schema.sql
           psql -h localhost -U postgres -d talledo_test -v ON_ERROR_STOP=1 -f supabase/migrations/002_enforce_adult_visibility.sql
           psql -h localhost -U postgres -d talledo_test -v ON_ERROR_STOP=1 -f supabase/migrations/003_shared_location_and_security.sql
+          psql -h localhost -U postgres -d talledo_test -v ON_ERROR_STOP=1 -f supabase/migrations/004_places_voice_and_push.sql
           psql -h localhost -U postgres -d talledo_test -v ON_ERROR_STOP=1 -f tests/database_security.sql
+          psql -h localhost -U postgres -d talledo_test -v ON_ERROR_STOP=1 -f tests/automatic_alerts.sql
+
+  push-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.2.12
+      - run: deno test --allow-env supabase/functions/family-push/index_test.ts
+        env:
+          FAMILY_PUSH_TEST: "true"
 
   build:
-    needs: database-tests
+    needs: [database-tests, push-tests]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
@@ -78,7 +91,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: TALLEDO-FAMILY-v5-test-reports
+          name: TALLEDO-FAMILY-v6-test-reports
           path: |
             app/build/test-results/testDebugUnitTest/
             app/build/reports/tests/testDebugUnitTest/
@@ -89,7 +102,7 @@ jobs:
         run: gradle --no-daemon -PMAPS_API_KEY="$MAPS_API_KEY" assembleDebug
 
       - name: Prepare named APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk TALLEDO-FAMILY-v5-debug.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk TALLEDO-FAMILY-v6-debug.apk
 
       - name: Generate synthetic offline demo
         run: python3 tests/create_offline_demo.py TALLEDO-DEMO-sin-calles.mbtiles
@@ -97,10 +110,11 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: TALLEDO-FAMILY-v5-debug-apk
+          name: TALLEDO-FAMILY-v6-debug-apk
           path: |
-            TALLEDO-FAMILY-v5-debug.apk
+            TALLEDO-FAMILY-v6-debug.apk
             TALLEDO-DEMO-sin-calles.mbtiles
             docs/OFFLINE_MAPS.md
+            docs/ACTIVATE_ALERTS.md
           if-no-files-found: error
           retention-days: 30

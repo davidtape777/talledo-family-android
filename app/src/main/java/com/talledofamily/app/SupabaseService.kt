@@ -10,7 +10,10 @@ import java.net.URL
 data class UserSession(val accessToken: String, val refreshToken: String, val userId: String, val expiresAt: Long = 0)
 data class FamilyMember(val id: String, val familyId: String, val authUserId: String?, val name: String, val relationship: String, val role: String, val avatarUrl: String?, val birthDate: String? = null, val phone: String? = null, val privacyPermitted: Boolean = true)
 data class FamilyInfo(val id: String, val name: String, val joinCode: String, val photoUrl: String?)
-data class SharedLocation(val memberId:String,val sharing:Boolean,val latitude:Double,val longitude:Double,val accuracy:Double,val capturedAt:String)
+data class SharedLocation(val memberId:String,val sharing:Boolean,val latitude:Double,val longitude:Double,val accuracy:Double,val capturedAt:String,val battery:Int?=null,val charging:Boolean=false)
+data class FamilyPlace(val id:String,val name:String,val kind:String,val latitude:Double,val longitude:Double,val radius:Int)
+data class PlaceState(val memberId:String,val placeId:String,val inside:Boolean,val observedAt:String)
+data class FamilyNotice(val id:String,val kind:String,val text:String,val createdAt:String,val read:Boolean,val pushState:String)
 data class RemoteFamilyMessage(val id:String,val senderId:String,val body:String,val createdAt:String)
 class SupabaseException(message: String) : Exception(message)
 
@@ -94,13 +97,33 @@ class SupabaseService {
     }
     suspend fun locations(session: UserSession, familyId: String): List<SharedLocation> = withContext(Dispatchers.IO) {
         val rows=JSONArray(request("/rest/v1/family_locations?family_id=eq.$familyId&select=*",token=session.accessToken))
-        List(rows.length()) { val o=rows.getJSONObject(it); SharedLocation(o.getString("member_id"),o.optBoolean("sharing"),o.optDouble("latitude"),o.optDouble("longitude"),o.optDouble("accuracy_m"),o.optString("captured_at")) }
+        List(rows.length()) { val o=rows.getJSONObject(it); SharedLocation(o.getString("member_id"),o.optBoolean("sharing"),o.optDouble("latitude"),o.optDouble("longitude"),o.optDouble("accuracy_m"),o.optString("captured_at"),if(o.isNull("battery_percent")) null else o.optInt("battery_percent"),o.optBoolean("charging")) }
     }
-    suspend fun publishLocation(session: UserSession, location: android.location.Location) = withContext(Dispatchers.IO) {
-        request("/rest/v1/rpc/publish_location","POST",session.accessToken,JSONObject()
+    suspend fun publishLocation(session: UserSession, location: android.location.Location,battery:Int?=null,charging:Boolean=false) = withContext(Dispatchers.IO) {
+        request("/rest/v1/rpc/publish_location_v6","POST",session.accessToken,JSONObject()
             .put("lat",location.latitude).put("lng",location.longitude).put("accuracy",location.accuracy.toDouble())
-            .put("captured",java.time.Instant.ofEpochMilli(location.time).toString()))
+            .put("captured",java.time.Instant.ofEpochMilli(location.time).toString()).put("battery",battery?:JSONObject.NULL).put("is_charging",charging))
     }
+    suspend fun places(session:UserSession,fid:String):List<FamilyPlace> = withContext(Dispatchers.IO) {
+        val rows=JSONArray(request("/rest/v1/family_places?family_id=eq.$fid&select=*&order=name",token=session.accessToken))
+        List(rows.length()){val o=rows.getJSONObject(it);FamilyPlace(o.getString("id"),o.getString("name"),o.getString("kind"),o.getDouble("latitude"),o.getDouble("longitude"),o.getInt("radius_m"))}
+    }
+    suspend fun placeStates(session:UserSession,fid:String):List<PlaceState> = withContext(Dispatchers.IO) {
+        val rows=JSONArray(request("/rest/v1/family_place_states?family_id=eq.$fid&select=*",token=session.accessToken))
+        List(rows.length()){val o=rows.getJSONObject(it);PlaceState(o.getString("member_id"),o.getString("place_id"),o.getBoolean("inside"),o.getString("observed_at"))}
+    }
+    suspend fun savePlace(session:UserSession,fid:String,name:String,kind:String,lat:Double,lng:Double,radius:Int) = withContext(Dispatchers.IO) {
+        request("/rest/v1/family_places","POST",session.accessToken,JSONObject().put("family_id",fid).put("name",name.trim()).put("kind",kind).put("latitude",lat).put("longitude",lng).put("radius_m",radius))
+    }
+    suspend fun deletePlace(session:UserSession,id:String) = withContext(Dispatchers.IO) {request("/rest/v1/family_places?id=eq.$id","DELETE",session.accessToken)}
+    suspend fun journey(session:UserSession,id:String) = withContext(Dispatchers.IO) {request("/rest/v1/rpc/announce_journey","POST",session.accessToken,JSONObject().put("destination",id))}
+    suspend fun notices(session:UserSession):List<FamilyNotice> = withContext(Dispatchers.IO) {
+        val rows=JSONArray(request("/rest/v1/family_notifications?select=id,kind,voice_text,created_at,read_at,push_state&order=created_at.desc&limit=50",token=session.accessToken))
+        List(rows.length()){val o=rows.getJSONObject(it);FamilyNotice(o.getString("id"),o.getString("kind"),o.getString("voice_text"),o.getString("created_at"),!o.isNull("read_at"),o.getString("push_state"))}
+    }
+    suspend fun readNotice(session:UserSession,id:String) = withContext(Dispatchers.IO) {request("/rest/v1/rpc/read_family_notification","POST",session.accessToken,JSONObject().put("notice",id))}
+    suspend fun registerPush(session:UserSession,device:String,token:String) = withContext(Dispatchers.IO) {request("/rest/v1/rpc/register_push_device","POST",session.accessToken,JSONObject().put("device",device).put("fcm_token",token))}
+    suspend fun unregisterPush(session:UserSession,device:String) = withContext(Dispatchers.IO) {request("/rest/v1/rpc/unregister_push_device","POST",session.accessToken,JSONObject().put("device",device))}
     suspend fun pauseLocation(session: UserSession) = withContext(Dispatchers.IO) {
         request("/rest/v1/rpc/pause_location","POST",session.accessToken,JSONObject())
     }

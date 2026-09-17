@@ -22,6 +22,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.withLock
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 private val TfPurple = Color(0xFF6B4EFF)
 private val TfCoral = Color(0xFFFF5F63)
@@ -188,7 +193,10 @@ private fun FamilyDashboard(session: UserSession, me: FamilyMember, onExit: () -
     val api=remember { SupabaseService() }
     val scope=rememberCoroutineScope()
     val context=androidx.compose.ui.platform.LocalContext.current
-    val guardian=me.role in listOf("admin","adult")
+    val lifecycle=LocalLifecycleOwner.current.lifecycle
+    val voice=remember(session.userId){FamilyVoice(context.applicationContext)}
+    var notices by remember{mutableStateOf(emptyList<FamilyNotice>())}
+    val guardian=me.role in listOf("admin","adult") && me.relationship in listOf("padre","madre","tutor")
     var family by remember { mutableStateOf<FamilyInfo?>(null) }
     var members by remember { mutableStateOf(emptyList<FamilyMember>()) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -204,7 +212,29 @@ private fun FamilyDashboard(session: UserSession, me: FamilyMember, onExit: () -
             members=api.members(session,me.familyId)
         }.onFailure { error=it.message }
     }}
-    LaunchedEffect(me) { reload() }
+    DisposableEffect(voice,lifecycle){
+        val observer=LifecycleEventObserver{_,_->voice.active=lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED);if(!voice.active) voice.stop()}
+        voice.active=lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        lifecycle.addObserver(observer)
+        onDispose{lifecycle.removeObserver(observer);voice.close()}
+    }
+    LaunchedEffect(me.id) {
+        FamilyPush.register(context,session)
+        val since=java.time.Instant.now()
+        val announced=mutableSetOf<String>()
+        while(true){
+            if(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                runCatching{family=api.family(session,me.familyId);members=api.members(session,me.familyId)}.onFailure{error=it.message}
+                runCatching{api.notices(session)}.onSuccess{rows->
+                    notices=rows
+                    val new=rows.filter{!it.read && it.id !in announced && runCatching{java.time.Instant.parse(it.createdAt).isAfter(since) && recentFamilyFix(it.createdAt)}.getOrDefault(false)}
+                    new.forEach{announced.add(it.id)}
+                    new.firstOrNull{it.kind!="message" || voice.readMessages}?.let{voice.speak(it.text,it.kind=="message")}
+                }
+            }
+            delay(10000)
+        }
+    }
 
     editMember?.let { target ->
         MemberEditDialog(session,target,me.role=="admin",{editMember=null}) { name,relation,birth,phone,avatar ->
@@ -223,8 +253,8 @@ private fun FamilyDashboard(session: UserSession, me: FamilyMember, onExit: () -
 
     Scaffold(
         containerColor=TfCream,
-        topBar={ TopAppBar(title={Column{Text(family?.name ?: "TALLEDO FAMILY",fontWeight=FontWeight.Black); Text("Cuenta real · mapa protegido",fontSize=11.sp,color=TfMint)}},actions={TextButton(onClick={scope.launch{runCatching{LocationSharing.pause(context)}.onSuccess{onExit()}.onFailure{error="No se pudo retirar la ubicación del servidor. Activa Internet y vuelve a pulsar Salir."}}}){Text("Salir")}},colors=TopAppBarDefaults.topAppBarColors(containerColor=TfCream)) },
-        bottomBar={ NavigationBar { listOf("Familia","Mapa","Mensajes","Privacidad").forEachIndexed { i,label -> NavigationBarItem(selected = selectedTab == i, onClick = { selectedTab = i }, icon = { Text(listOf("⌂","◎","✉","◉")[i], fontSize = 20.sp) }, label = { Text(label) }) } } }
+        topBar={ TopAppBar(title={Column{Text(family?.name ?: "TALLEDO FAMILY",fontWeight=FontWeight.Black); Text("Cuenta real · mapa protegido",fontSize=11.sp,color=TfMint)}},actions={TextButton(onClick={scope.launch{runCatching{LocationSharing.pause(context);LocationSharing.mutex.withLock{FamilyPush.unregister(context,session);voice.stop();onExit()}}.onFailure{error="No se pudo retirar la ubicación o el dispositivo del servidor. Activa Internet y vuelve a pulsar Salir."}}}){Text("Salir")}},colors=TopAppBarDefaults.topAppBarColors(containerColor=TfCream)) },
+        bottomBar={ NavigationBar { listOf("Familia","Mapa","Mensajes","Privacidad","Avisos").forEachIndexed { i,label -> NavigationBarItem(selected = selectedTab == i, onClick = { selectedTab = i }, icon = { Text(listOf("⌂","◎","✉","◉","♪")[i], fontSize = 20.sp) }, label = { Text(label) }) } } }
     ){ padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when(selectedTab) {
@@ -260,9 +290,10 @@ private fun FamilyDashboard(session: UserSession, me: FamilyMember, onExit: () -
                         Button(onClick={scope.launch{runCatching{api.sendEvent(session,me.familyId,me.id,"need_me")}.onSuccess{notice="Prueba TE NECESITO registrada; no se enviaron alertas externas"}.onFailure{error=it.message}}},Modifier.fillMaxWidth().height(58.dp),colors=ButtonDefaults.buttonColors(containerColor=TfCoral)){Text("TE NECESITO · PRUEBA",fontWeight=FontWeight.Black)}
                     }
                 }
-                1 -> SharedFamilyMap(session,me,members)
+                1 -> SharedFamilyMap(session,me,members,voice)
                 2 -> SyncedMessages(session,me,members)
-                else -> PrivacyScreen(session,api,me,members) { error=it }
+                3 -> PrivacyScreen(session,api,me,members) { error=it }
+                else -> FamilyAlertsScreen(session,me,notices,voice)
             }
             error?.let { AlertDialog(onDismissRequest={error=null},title={Text("No se pudo completar")},text={Text(it)},confirmButton={TextButton(onClick={error=null}){Text("Entendido")}}) }
             notice?.let { AlertDialog(onDismissRequest={notice=null},title={Text("Listo")},text={Text(it)},confirmButton={TextButton(onClick={notice=null}){Text("Cerrar")}}) }

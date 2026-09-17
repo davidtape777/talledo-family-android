@@ -15,8 +15,8 @@ android {
         applicationId = "com.talledofamily.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "5.0-optional-offline-map"
+        versionCode = 6
+        versionName = "6.0-family-voice-and-alerts"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey.get()

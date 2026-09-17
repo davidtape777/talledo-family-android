@@ -57,7 +57,12 @@ class LocationShareService:Service() {
                     if(!LocationSharing.enabled) return@withLock
                     val session=SessionVault.current() ?: return@withLock
                     try {
-                        SupabaseService().publishLocation(session,location)
+                        val battery=registerReceiver(null,IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+                        val level=battery?.getIntExtra(BatteryManager.EXTRA_LEVEL,-1)?:-1
+                        val scale=battery?.getIntExtra(BatteryManager.EXTRA_SCALE,-1)?:-1
+                        val percent=if(level>=0 && scale>0) (100*level/scale).coerceIn(0,100) else null
+                        val charging=(battery?.getIntExtra(BatteryManager.EXTRA_PLUGGED,0)?:0)!=0
+                        SupabaseService().publishLocation(session,location,percent,charging)
                         LocationSharing.status.value="Último envío: "+java.time.LocalTime.now().withNano(0)
                     } catch(e:Exception) {
                         LocationSharing.status.value="Sin sincronizar: "+(e.message?:"revisa la conexión")

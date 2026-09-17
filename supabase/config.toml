@@ -1,0 +1,2 @@
+[functions.family-push]
+verify_jwt = false

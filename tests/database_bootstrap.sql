@@ -1,5 +1,7 @@
 create role authenticated nologin;
 create role anon nologin;
+create role service_role nologin bypassrls;
+grant usage on schema public to service_role;
 create schema auth;
 create schema storage;
 create table auth.users(id uuid primary key);
