@@ -20,7 +20,11 @@ El secreto `FIREBASE_SERVICE_ACCOUNT_JSON` debe contener el JSON privado complet
 
 ## 3. Webhook de base de datos
 
-En Supabase, abre **Database → Webhooks**, habilítalos si hace falta y crea uno:
+En **Edge Functions → Secrets**, crea `FAMILY_WEBHOOK_SECRET` con un valor aleatorio de al menos 32 caracteres generado por un gestor de contraseñas, sin espacios iniciales/finales. Guarda una copia privada para el encabezado del webhook. No es tu contraseña ni una clave API; no lo envíes al chat ni lo guardes en Android/GitHub. Este secreto autentica el webhook; la clave de servicio preconfigurada se usa únicamente para las consultas administrativas del servidor.
+
+Si ya tienes la función anterior, reemplaza su código completo por la versión actual y pulsa **Deploy updates**, dejando Verify JWT desactivado. Esta corrección de servidor no requiere reinstalar Android ni volver a ejecutar SQL.
+
+Abre https://supabase.com/dashboard/project/xxlakmkmlhfhscvdpeyu/integrations/webhooks/webhooks, instala la integración si hace falta y crea uno (o edita el existente, sin duplicarlo):
 
 | Campo | Valor |
 |---|---|
@@ -29,11 +33,11 @@ En Supabase, abre **Database → Webhooks**, habilítalos si hace falta y crea u
 | Evento | Solo `INSERT` |
 | Tipo | Supabase Edge Functions (o HTTP POST) |
 | Función / URL | `family-push` / `https://xxlakmkmlhfhscvdpeyu.supabase.co/functions/v1/family-push` |
-| Autorización | **Add auth header with service key** |
+| Encabezado personalizado | Nombre `x-family-webhook-secret`; valor idéntico a `FAMILY_WEBHOOK_SECRET` |
 | Content-Type | `application/json` |
 | Timeout HTTP, si aparece | `10000` ms |
 
-Si la pantalla no ofrece añadir automáticamente la clave de servicio, agrega el encabezado `Authorization: Bearer <service_role legacy key>` dentro del panel de Supabase. Usa únicamente la clave `service_role` de ese mismo proyecto (Settings → API Keys → Legacy), no `sb_publishable_...`, `anon` ni una clave de otro proyecto. No la copies al chat, Android ni GitHub. Esta clave da acceso administrativo: nunca uses un webhook hacia un dominio distinto.
+El valor del encabezado es SOLO el secreto personalizado, sin `Bearer`, comillas ni dos puntos. Añádelo con **Add header**, no con **Add secret key**. Después de desplegar el código actualizado, elimina del webhook la fila `Authorization` anterior, conserva `Content-type: application/json`, añade `x-family-webhook-secret` y guarda. No elimines los secretos predeterminados de Supabase ni el secreto Firebase. La función rechaza claves públicas y la antigua autorización de servicio como sustitutos de este encabezado. No uses este secreto para webhooks hacia otros dominios.
 
 El cuerpo estándar del webhook incluye `type`, `schema`, `table` y `record.id`. La función ignora el texto y el destinatario recibidos, consulta la base y vuelve a comprobar permisos. El envío es genérico, sin coordenadas, nombres ni contenido del mensaje en Firebase o pantalla bloqueada.
 

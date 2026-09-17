@@ -1,13 +1,35 @@
 import { handleRequest, sameSecret } from './index.ts';
 function assert(value: boolean, message = 'Assertion failed'): void { if (!value) throw Error(message); }
-const env = (key: string) => ({ SUPABASE_URL: 'https://test.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'test-service-secret' } as Record<string, string>)[key];
+const webhookSecret = 'test-only-webhook-secret-32-characters';
+const env = (key: string) => ({ SUPABASE_URL: 'https://test.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'test-service-secret', FAMILY_WEBHOOK_SECRET: webhookSecret } as Record<string, string>)[key];
 const id = '00000000-0000-0000-0000-000000000001';
 const payload = { type: 'INSERT', schema: 'public', table: 'family_notifications', record: { id } };
-function request(body: object = payload, secret = 'test-service-secret') { return new Request('https://test/function', { method: 'POST', headers: { Authorization: `Bearer ${secret}` }, body: JSON.stringify(body) }); }
+function request(body: object = payload, secret = webhookSecret) { return new Request('https://test/function', { method: 'POST', headers: { 'x-family-webhook-secret': secret }, body: JSON.stringify(body) }); }
 Deno.test('constant-time digest compares secrets', async () => { assert(await sameSecret('abc', 'abc')); assert(!await sameSecret('abc', 'abcd')); });
 Deno.test('rejects anon or normal user before database', async () => {
   const response = await handleRequest(request(payload, 'publishable'), env, () => { throw Error('Unexpected fetch'); });
   assert(response.status === 401);
+});
+Deno.test('missing, wrong or legacy Authorization cannot replace dedicated webhook secret', async () => {
+  for (const headers of [{}, { Authorization: 'Bearer test-service-secret' }, { Authorization: 'Bearer sb_publishable_test' }, { 'x-family-webhook-secret': 'test-service-secret' }]) {
+    const req = new Request('https://test/function', { method: 'POST', headers: headers as Record<string, string>, body: JSON.stringify(payload) });
+    assert((await handleRequest(req, env, () => { throw Error('Unexpected fetch'); })).status === 401);
+  }
+});
+Deno.test('missing or short or padded webhook configuration fails closed', async () => {
+  for (const secret of [undefined, 'short', ` ${webhookSecret}`]) {
+    assert((await handleRequest(request(), key => key === 'FAMILY_WEBHOOK_SECRET' ? secret : env(key), () => { throw Error('Unexpected fetch'); })).status === 503);
+  }
+});
+Deno.test('valid custom header authorizes without Authorization; database still uses server credential', async () => {
+  const response = await handleRequest(request(), env, async (_url, options) => {
+    const headers = new Headers(options?.headers);
+    assert(headers.get('Authorization') === 'Bearer test-service-secret');
+    assert(headers.get('apikey') === 'test-service-secret');
+    assert(headers.get('x-family-webhook-secret') === null);
+    return new Response('null');
+  });
+  assert(response.status === 200);
 });
 Deno.test('rejects forged table and malformed UUID', async () => {
   for (const data of [{ ...payload, table: 'family_members' }, { ...payload, record: { id: 'bad' } }, { ...payload, type: 'UPDATE' }]) {

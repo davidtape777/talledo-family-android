@@ -34,8 +34,9 @@ export async function handleRequest(request: Request, env: Env = name => Deno.en
   if (request.method !== 'POST') return respond(405, 'method');
   const service = env('SUPABASE_SERVICE_ROLE_KEY');
   const url = env('SUPABASE_URL');
-  if (!service || !url) return respond(503, 'configuration');
-  if (!await sameSecret(request.headers.get('Authorization') || '', `Bearer ${service}`)) return respond(401, 'unauthorized');
+  const webhookSecret = env('FAMILY_WEBHOOK_SECRET');
+  if (!service || !url || !webhookSecret || webhookSecret.length < 32 || webhookSecret.trim() !== webhookSecret) return respond(503, 'configuration');
+  if (!await sameSecret(request.headers.get('x-family-webhook-secret') || '', webhookSecret)) return respond(401, 'unauthorized');
   if (Number(request.headers.get('Content-Length') || 0) > 16384) return respond(413, 'payload');
   let id: string;
   try {
