@@ -196,9 +196,10 @@ private fun FamilyDashboard(session: UserSession, me: FamilyMember, onExit: () -
     val lifecycle=LocalLifecycleOwner.current.lifecycle
     val voice=remember(session.userId){FamilyVoice(context.applicationContext,session.userId)}
     var notices by remember{mutableStateOf(emptyList<FamilyNotice>())}
-    val guardian=me.role in listOf("admin","adult") && me.relationship in listOf("padre","madre","tutor")
     var family by remember { mutableStateOf<FamilyInfo?>(null) }
     var members by remember { mutableStateOf(emptyList<FamilyMember>()) }
+    val syncedMe=members.firstOrNull{it.id==me.id}?:me
+    val guardian=syncedMe.role in listOf("admin","adult") && syncedMe.relationship in listOf("padre","madre","tutor")
     var error by remember { mutableStateOf<String?>(null) }
     var editMember by remember { mutableStateOf<FamilyMember?>(null) }
     var addMember by remember { mutableStateOf(false) }
@@ -290,10 +291,10 @@ private fun FamilyDashboard(session: UserSession, me: FamilyMember, onExit: () -
                         Button(onClick={scope.launch{runCatching{api.sendEvent(session,me.familyId,me.id,"need_me")}.onSuccess{notice="Prueba TE NECESITO registrada; no se enviaron alertas externas"}.onFailure{error=it.message}}},Modifier.fillMaxWidth().height(58.dp),colors=ButtonDefaults.buttonColors(containerColor=TfCoral)){Text("TE NECESITO · PRUEBA",fontWeight=FontWeight.Black)}
                     }
                 }
-                1 -> SharedFamilyMap(session,me,members,voice)
-                2 -> SyncedMessages(session,me,members)
-                3 -> PrivacyScreen(session,api,me,members) { error=it }
-                else -> FamilyAlertsScreen(session,me,notices,voice)
+                1 -> SharedFamilyMap(session,syncedMe,members,voice)
+                2 -> SyncedMessages(session,syncedMe,members)
+                3 -> PrivacyScreen(session,api,syncedMe,members) { error=it }
+                else -> FamilyAlertsScreen(session,syncedMe,notices,voice)
             }
             error?.let { AlertDialog(onDismissRequest={error=null},title={Text("No se pudo completar")},text={Text(it)},confirmButton={TextButton(onClick={error=null}){Text("Entendido")}}) }
             notice?.let { AlertDialog(onDismissRequest={notice=null},title={Text("Listo")},text={Text(it)},confirmButton={TextButton(onClick={notice=null}){Text("Cerrar")}}) }

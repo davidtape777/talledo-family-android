@@ -21,6 +21,7 @@ fun FamilyAlertsScreen(session:UserSession,me:FamilyMember,notices:List<FamilyNo
     val context=LocalContext.current
     val api=remember{SupabaseService()}
     val scope=rememberCoroutineScope()
+    val registrationStatus by FamilyPush.registrationStatus.collectAsState()
     var places by remember{mutableStateOf(emptyList<FamilyPlace>())}
     var error by remember{mutableStateOf<String?>(null)}
     var enabled by remember{mutableStateOf(voice.enabled)}
@@ -56,6 +57,7 @@ fun FamilyAlertsScreen(session:UserSession,me:FamilyMember,notices:List<FamilyNo
             if(Build.VERSION.SDK_INT>=33) permission.launch(Manifest.permission.POST_NOTIFICATIONS)
             else FamilyPush.register(context,session)
         },modifier=Modifier.fillMaxWidth()){Text("HABILITAR AVISOS EN ESTE DISPOSITIVO")}}
+        item{Text(registrationStatus,style=MaterialTheme.typography.bodySmall)}
         item{Text("Lugares y alertas",style=MaterialTheme.typography.titleLarge);Text("Padres/tutores: mantén pulsado el mapa para agregar casa, colegio u otro lugar. Dos lecturas GPS precisas confirman entradas y salidas. No se avisa al activar GPS por primera vez.",style=MaterialTheme.typography.bodySmall)}
         items(places,key={it.id}){place->Card(Modifier.fillMaxWidth()){Column(Modifier.padding(12.dp)){
             Text("${place.name} · ${place.kind} · radio ${place.radius} m")
