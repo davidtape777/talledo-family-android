@@ -194,7 +194,7 @@ private fun FamilyDashboard(session: UserSession, me: FamilyMember, onExit: () -
     val scope=rememberCoroutineScope()
     val context=androidx.compose.ui.platform.LocalContext.current
     val lifecycle=LocalLifecycleOwner.current.lifecycle
-    val voice=remember(session.userId){FamilyVoice(context.applicationContext)}
+    val voice=remember(session.userId){FamilyVoice(context.applicationContext,session.userId)}
     var notices by remember{mutableStateOf(emptyList<FamilyNotice>())}
     val guardian=me.role in listOf("admin","adult") && me.relationship in listOf("padre","madre","tutor")
     var family by remember { mutableStateOf<FamilyInfo?>(null) }

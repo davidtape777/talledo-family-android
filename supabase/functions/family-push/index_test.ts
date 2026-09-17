@@ -30,3 +30,30 @@ Deno.test('does not leak Firebase configuration or errors', async () => {
   const response = await handleRequest(request(), env, async url => new Response(String(url).includes('claim_') ? JSON.stringify({ id, tokens: ['test-device'] }) : 'null'));
   assert(response.status === 502 && !((await response.text()).includes('secret')));
 });
+Deno.test('signs OAuth and sends only generic account-bound FCM data', async () => {
+  const keys = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+  const pkcs8 = new Uint8Array(await crypto.subtle.exportKey('pkcs8', keys.privateKey));
+  const encoded = btoa(Array.from(pkcs8, v => String.fromCharCode(v)).join(''));
+  const account = JSON.stringify({ project_id: 'talledo-family', client_email: 'test@test.iam.gserviceaccount.com', private_key: `-----BEGIN PRIVATE KEY-----\n${encoded}\n-----END PRIVATE KEY-----` });
+  let delivered = false, completed = false;
+  const fake: typeof fetch = async (url, options) => {
+    const endpoint = String(url);
+    if (endpoint.includes('claim_family_notification')) return new Response(JSON.stringify({ id, user_id: id, kind: 'message', tokens: ['test-device-token'] }));
+    if (endpoint === 'https://oauth2.googleapis.com/token') {
+      const form = options?.body as URLSearchParams;
+      assert((form.get('assertion') || '').split('.').length === 3);
+      return new Response(JSON.stringify({ access_token: 'fake-google-token' }));
+    }
+    if (endpoint.startsWith('https://fcm.googleapis.com/')) {
+      const body = JSON.parse(String(options?.body));
+      assert(body.message.notification === undefined);
+      assert(Object.keys(body.message.data).sort().join(',') === 'kind,notification_id,user_id');
+      assert(body.message.data.user_id === id && !JSON.stringify(body).includes('test-service-secret'));
+      delivered = true; return new Response('{}');
+    }
+    if (endpoint.includes('complete_family_notification')) { assert(JSON.parse(String(options?.body)).succeeded === true); completed = true; return new Response('null'); }
+    throw Error('Unexpected URL');
+  };
+  const response = await handleRequest(request(), key => key === 'FIREBASE_SERVICE_ACCOUNT_JSON' ? account : env(key), fake);
+  assert(response.status === 200 && delivered && completed);
+});

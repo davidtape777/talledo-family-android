@@ -141,7 +141,7 @@ fun SharedFamilyMap(session:UserSession,me:FamilyMember,members:List<FamilyMembe
                 }}.padding(vertical=6.dp)){
                     Text(name,style=MaterialTheme.typography.titleSmall)
                     Text(locationAgeLabel(loc.capturedAt)+" · ±${loc.accuracy.toInt()} m"+ (loc.battery?.let{" · $it %"+(if(loc.charging) " cargando" else "")}?:""),style=MaterialTheme.typography.bodySmall)
-                    if(place!=null && recentFamilyFix(loc.capturedAt)) Text("En ${place.name} · zona confirmada por GPS",style=MaterialTheme.typography.labelSmall)
+                    if(place!=null && recentFamilyFix(loc.capturedAt)) Text("Última zona confirmada: ${place.name}",style=MaterialTheme.typography.labelSmall)
                 }
             }
         }
